@@ -17,8 +17,8 @@
   const canvas = document.getElementById("game-canvas");
   const ctx = canvas.getContext("2d");
 
-  // 過關條件：敵機出現 1 架
-  const ENEMY_CLEAR_GOAL = 1;
+  // 過關條件：敵機出現 100 架
+  const ENEMY_CLEAR_GOAL = 100;
 
   const state = {
     running: false,
