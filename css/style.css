@@ -283,17 +283,23 @@ body {
   right: 0;
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
   padding:
     calc(12px + var(--safe-top))
     calc(16px + var(--safe-right))
     8px
     calc(16px + var(--safe-left));
-  font-size: clamp(0.95rem, 3.2vw, 1.1rem);
+  font-size: clamp(0.85rem, 2.8vw, 1.05rem);
   letter-spacing: 0.08em;
   color: #fff8e8;
   text-shadow: 0 2px 8px rgba(60, 30, 10, 0.55);
   pointer-events: none;
+}
+
+.hud-item {
+  white-space: nowrap;
 }
 
 #game-canvas {

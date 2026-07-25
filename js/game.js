@@ -9,10 +9,17 @@
   const btnMenu = document.getElementById("btn-menu");
   const scoreEl = document.getElementById("score");
   const livesEl = document.getElementById("lives");
+  const enemyCountEl = document.getElementById("enemy-count");
+  const enemyGoalEl = document.getElementById("enemy-goal");
   const finalScoreEl = document.getElementById("final-score");
+  const overTitleEl = document.getElementById("over-title");
+  const overMessageEl = document.getElementById("over-message");
   const hintEl = document.getElementById("control-hint");
   const canvas = document.getElementById("game-canvas");
   const ctx = canvas.getContext("2d");
+
+  // 過關條件：敵機出現 50 架
+  const ENEMY_CLEAR_GOAL = 50;
 
   const state = {
     running: false,
@@ -21,6 +28,8 @@
     dpr: 1,
     score: 0,
     lives: 3,
+    enemiesSpawned: 0,
+    cleared: false,
     player: null,
     bullets: [],
     enemies: [],
@@ -119,6 +128,8 @@
   function resetGame() {
     state.score = 0;
     state.lives = 3;
+    state.enemiesSpawned = 0;
+    state.cleared = false;
     state.bullets = [];
     state.enemies = [];
     state.particles = [];
@@ -132,6 +143,8 @@
     hintEl.classList.remove("is-faded");
     scoreEl.textContent = "0";
     livesEl.textContent = "3";
+    enemyCountEl.textContent = "0";
+    enemyGoalEl.textContent = String(ENEMY_CLEAR_GOAL);
     state.player = {
       x: state.width / 2,
       y: state.height - 72,
@@ -151,11 +164,25 @@
     state.raf = requestAnimationFrame(loop);
   }
 
-  function endGame() {
+  function endGame(won) {
     state.running = false;
     cancelAnimationFrame(state.raf);
-    finalScoreEl.textContent = String(state.score);
+    if (won) {
+      overTitleEl.textContent = "過關成功";
+      overMessageEl.innerHTML = `敵機已出現 ${ENEMY_CLEAR_GOAL} 架！獲得金錢 <span id="final-score">${state.score}</span>`;
+    } else {
+      overTitleEl.textContent = "任務失敗";
+      overMessageEl.innerHTML = `獲得金錢 <span id="final-score">${state.score}</span>`;
+    }
     showScreen(overScreen);
+  }
+
+  function checkStageClear() {
+    if (state.cleared) return;
+    if (state.enemiesSpawned >= ENEMY_CLEAR_GOAL && state.enemies.length === 0) {
+      state.cleared = true;
+      endGame(true);
+    }
   }
 
   function backToMenu() {
@@ -165,6 +192,7 @@
   }
 
   function spawnEnemy() {
+    if (state.enemiesSpawned >= ENEMY_CLEAR_GOAL) return;
     const size = rand(34, 48);
     state.enemies.push({
       x: rand(size, state.width - size),
@@ -176,6 +204,8 @@
       swaySpeed: rand(1.2, 2.4),
       hp: 1,
     });
+    state.enemiesSpawned += 1;
+    enemyCountEl.textContent = String(state.enemiesSpawned);
   }
 
   function burst(x, y, color, count = 10) {
@@ -276,11 +306,13 @@
     });
     state.bullets = state.bullets.filter((b) => b.y > -40);
 
-    state.spawnTimer -= dt;
-    if (state.spawnTimer <= 0) {
-      spawnEnemy();
-      const pace = Math.max(0.35, 1.1 - state.score * 0.01);
-      state.spawnTimer = pace;
+    if (state.enemiesSpawned < ENEMY_CLEAR_GOAL) {
+      state.spawnTimer -= dt;
+      if (state.spawnTimer <= 0) {
+        spawnEnemy();
+        const pace = Math.max(0.35, 1.1 - state.score * 0.01);
+        state.spawnTimer = pace;
+      }
     }
 
     state.enemies.forEach((e) => {
@@ -318,13 +350,16 @@
         state.invuln = 1.5;
         burst(p.x, p.y, "#7dba5a", 16);
         if (state.lives <= 0) {
-          endGame();
+          endGame(false);
           return;
         }
       }
 
       if (dead) state.enemies.splice(i, 1);
     }
+
+    checkStageClear();
+    if (!state.running) return;
 
     state.particles = state.particles.filter((pt) => {
       pt.life -= dt;
