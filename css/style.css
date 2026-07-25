@@ -291,7 +291,8 @@ body {
     calc(16px + var(--safe-left));
   font-size: clamp(0.95rem, 3.2vw, 1.1rem);
   letter-spacing: 0.08em;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  color: #fff8e8;
+  text-shadow: 0 2px 8px rgba(60, 30, 10, 0.55);
   pointer-events: none;
 }
 
