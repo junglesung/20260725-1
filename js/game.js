@@ -22,7 +22,7 @@
   const ENEMY_SPAWN_TOTAL = 200;
   const ENEMY_KILL_GOAL = 100;
   const STAGE_TIME = 60;
-  const FOG_COUNT = 100;
+  const MEERKAT_COUNT = 12;
   const PUDDING_COUNT = 20;
 
   const state = {
@@ -41,7 +41,7 @@
     enemies: [],
     particles: [],
     moneys: [],
-    fogBands: [],
+    meerkats: [],
     puddingDogs: [],
     dunes: [],
     desertDuck: null,
@@ -130,21 +130,19 @@
       { y: state.height * 0.82, amp: 44, color: "#e6b87a" },
     ];
 
-    // 霧濛 100 隻，集中在畫面右邊
-    const fogLeft = state.width * 0.58;
-    const fogRight = state.width * 0.98;
-    state.fogBands = Array.from({ length: FOG_COUNT }, (_, i) => ({
-      x: rand(fogLeft, fogRight),
-      y: rand(state.height * 0.06, state.height * 0.94),
-      w: rand(36, 90),
-      h: rand(14, 32),
-      speed: rand(10, 28) * (i % 2 === 0 ? 1 : -1),
-      bob: rand(0, Math.PI * 2),
-      bobSpeed: rand(0.6, 1.8),
-      alpha: rand(0.12, 0.32),
-      minX: fogLeft,
-      maxX: fogRight,
-    }));
+    // 狐獴 12 隻，排在畫面右邊（站立的動物）
+    const rightX = state.width * 0.82;
+    state.meerkats = Array.from({ length: MEERKAT_COUNT }, (_, i) => {
+      const col = i % 3;
+      const row = Math.floor(i / 3);
+      return {
+        x: rightX + col * Math.min(34, state.width * 0.055),
+        y: state.height * 0.18 + row * ((state.height * 0.7) / 4),
+        scale: 0.95 + (i % 3) * 0.08,
+        bob: rand(0, Math.PI * 2),
+        bobSpeed: rand(1.2, 2.4),
+      };
+    });
 
     // 布丁狗 20 隻，排在畫面左邊
     const leftX = state.width * 0.06;
@@ -465,17 +463,8 @@
       }
     }
 
-    state.fogBands.forEach((f) => {
-      f.x += f.speed * dt;
-      f.bob += f.bobSpeed * dt;
-      // 霧濛只在右邊區域來回飄
-      if (f.x > f.maxX) {
-        f.x = f.maxX;
-        f.speed = -Math.abs(f.speed);
-      } else if (f.x < f.minX) {
-        f.x = f.minX;
-        f.speed = Math.abs(f.speed);
-      }
+    state.meerkats.forEach((m) => {
+      m.bob += m.bobSpeed * dt;
     });
 
     state.puddingDogs.forEach((dog) => {
@@ -668,23 +657,115 @@
       drawDuck(d.x, d.y + Math.sin(d.bob) * 3, d.scale, d.facing, {});
     }
 
-    // 霧濛 100 隻
-    state.fogBands.forEach((f) => {
-      const fy = f.y + Math.sin(f.bob) * 6;
-      ctx.globalAlpha = f.alpha;
-      ctx.fillStyle = "rgba(255, 242, 215, 0.95)";
-      ctx.beginPath();
-      ctx.ellipse(f.x, fy, f.w * 0.5, f.h * 0.5, 0, 0, Math.PI * 2);
-      ctx.ellipse(f.x - f.w * 0.22, fy + 2, f.w * 0.28, f.h * 0.4, 0, 0, Math.PI * 2);
-      ctx.ellipse(f.x + f.w * 0.24, fy + 1, f.w * 0.3, f.h * 0.38, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    });
-
-    // 右側 20 隻布丁狗（畫在霧之上，清楚可見）
+    // 左邊 20 隻布丁狗
     state.puddingDogs.forEach((dog) => {
       drawPuddingDog(dog.x, dog.y + Math.sin(dog.bob) * 3, dog.scale);
     });
+
+    // 右邊 12 隻狐獴（動物，清楚可見）
+    state.meerkats.forEach((m) => {
+      drawMeerkat(m.x, m.y + Math.sin(m.bob) * 2.5, m.scale);
+    });
+  }
+
+  function drawMeerkat(x, y, scale = 1) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+
+    // 尾巴
+    ctx.strokeStyle = "#a67c4a";
+    ctx.lineWidth = 3.5;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(6, 18);
+    ctx.quadraticCurveTo(16, 10, 14, -2);
+    ctx.stroke();
+
+    // 後腳
+    ctx.fillStyle = "#c9955a";
+    ctx.beginPath();
+    ctx.ellipse(-5, 22, 3.5, 2.2, 0, 0, Math.PI * 2);
+    ctx.ellipse(5, 22, 3.5, 2.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 身體（站立）
+    const body = ctx.createLinearGradient(-8, 0, 8, 0);
+    body.addColorStop(0, "#b8844c");
+    body.addColorStop(0.5, "#d4a06a");
+    body.addColorStop(1, "#a6743e");
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.ellipse(0, 8, 8, 14, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 肚皮
+    ctx.fillStyle = "#f0d8b0";
+    ctx.beginPath();
+    ctx.ellipse(0, 10, 4.5, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 手臂
+    ctx.fillStyle = "#c9955a";
+    ctx.beginPath();
+    ctx.ellipse(-8, 6, 2.4, 6, 0.25, 0, Math.PI * 2);
+    ctx.ellipse(8, 6, 2.4, 6, -0.25, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 頭
+    ctx.fillStyle = "#d4a06a";
+    ctx.beginPath();
+    ctx.ellipse(0, -10, 8.5, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 耳朵
+    ctx.fillStyle = "#b8844c";
+    ctx.beginPath();
+    ctx.ellipse(-6.5, -16, 2.6, 3.2, -0.2, 0, Math.PI * 2);
+    ctx.ellipse(6.5, -16, 2.6, 3.2, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#f0d8b0";
+    ctx.beginPath();
+    ctx.ellipse(-6.5, -16, 1.2, 1.6, -0.2, 0, Math.PI * 2);
+    ctx.ellipse(6.5, -16, 1.2, 1.6, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 眼周深色
+    ctx.fillStyle = "#5a3a22";
+    ctx.beginPath();
+    ctx.ellipse(-3.2, -11, 2.4, 2.8, 0, 0, Math.PI * 2);
+    ctx.ellipse(3.2, -11, 2.4, 2.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 眼睛（亮）
+    ctx.fillStyle = "#1a120c";
+    ctx.beginPath();
+    ctx.arc(-3.2, -11, 1.35, 0, Math.PI * 2);
+    ctx.arc(3.2, -11, 1.35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(-3.6, -11.5, 0.45, 0, Math.PI * 2);
+    ctx.arc(2.8, -11.5, 0.45, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 鼻子
+    ctx.fillStyle = "#2a1a10";
+    ctx.beginPath();
+    ctx.ellipse(0, -7.5, 1.5, 1.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 嘴巴
+    ctx.strokeStyle = "#2a1a10";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, -6.5);
+    ctx.quadraticCurveTo(-2.5, -5, -3.5, -5.5);
+    ctx.moveTo(0, -6.5);
+    ctx.quadraticCurveTo(2.5, -5, 3.5, -5.5);
+    ctx.stroke();
+
+    ctx.restore();
   }
 
   function drawPuddingDog(x, y, scale = 1) {
