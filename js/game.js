@@ -11,7 +11,6 @@
   const livesEl = document.getElementById("lives");
   const enemyCountEl = document.getElementById("enemy-count");
   const enemyGoalEl = document.getElementById("enemy-goal");
-  const finalScoreEl = document.getElementById("final-score");
   const overTitleEl = document.getElementById("over-title");
   const overMessageEl = document.getElementById("over-message");
   const hintEl = document.getElementById("control-hint");
