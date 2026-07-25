@@ -165,12 +165,12 @@
   }
 
   function spawnEnemy() {
-    const size = rand(28, 44);
+    const size = rand(34, 48);
     state.enemies.push({
       x: rand(size, state.width - size),
       y: -size,
       w: size,
-      h: size * 0.7,
+      h: size * 0.85,
       speed: rand(70, 140) + state.score * 0.8,
       sway: rand(0, Math.PI * 2),
       swaySpeed: rand(1.2, 2.4),
@@ -196,18 +196,19 @@
   }
 
   function spawnMoney(x, y, value) {
+    // 敵機位置變成金錢，先停一下讓玩家看清楚，再慢慢落下
     state.moneys.push({
-      x,
-      y,
-      w: 28,
-      h: 28,
-      vx: rand(-40, 40),
-      vy: rand(-80, -30),
+      x: clamp(x, 24, state.width - 24),
+      y: clamp(y, 40, state.height - 48),
+      w: 36,
+      h: 36,
+      vx: rand(-25, 25),
+      vy: 0,
       value,
       spin: 0,
       life: 0,
       grounded: 0,
-      pop: 0,
+      floatTime: 0.45,
     });
   }
 
@@ -219,11 +220,13 @@
     state.moneys.splice(index, 1);
   }
 
-  function hitTest(a, b) {
-    return (
-      Math.abs(a.x - b.x) < (a.w + b.w) * 0.42 &&
-      Math.abs(a.y - b.y) < (a.h + b.h) * 0.42
-    );
+  // 以中心點＋寬高做 AABB，略放大讓射擊手感更準
+  function hitTest(a, b, pad = 0) {
+    const aw = (a.w || 0) * 0.5 + pad;
+    const ah = (a.h || 0) * 0.5 + pad;
+    const bw = (b.w || 0) * 0.5 + pad;
+    const bh = (b.h || 0) * 0.5 + pad;
+    return Math.abs(a.x - b.x) <= aw + bw && Math.abs(a.y - b.y) <= ah + bh;
   }
 
   function update(dt) {
@@ -253,24 +256,25 @@
 
     state.shootCooldown -= dt;
     if (state.shootCooldown <= 0) {
-      // 小鴨鴨炸彈
+      // 小鴨鴨炸彈（碰撞箱對齊畫面大小）
       state.bullets.push({
         x: p.x,
-        y: p.y - 26,
-        w: 18,
-        h: 18,
-        speed: 420,
+        y: p.y - 28,
+        w: 30,
+        h: 30,
+        speed: 380,
         spin: rand(0, Math.PI * 2),
         spinSpeed: rand(6, 10),
       });
-      state.shootCooldown = 0.28;
+      state.shootCooldown = 0.26;
     }
 
-    state.bullets = state.bullets.filter((b) => {
+    // 先更新子彈位置，再用較大判定檢查是否擊中敵機
+    state.bullets.forEach((b) => {
       b.y -= b.speed * dt;
       b.spin += b.spinSpeed * dt;
-      return b.y > -30;
     });
+    state.bullets = state.bullets.filter((b) => b.y > -40);
 
     state.spawnTimer -= dt;
     if (state.spawnTimer <= 0) {
@@ -289,16 +293,18 @@
     for (let i = state.enemies.length - 1; i >= 0; i -= 1) {
       const e = state.enemies[i];
       let dead = false;
+      let turnedToMoney = false;
 
       for (let j = state.bullets.length - 1; j >= 0; j -= 1) {
         const b = state.bullets[j];
-        if (hitTest(e, b)) {
+        // 炸彈對敵機多給一點容錯，避免「看起來打中卻沒判定」
+        if (hitTest(e, b, 8)) {
           state.bullets.splice(j, 1);
           dead = true;
-          // 敵機被小鴨炸彈射中 → 變成金錢
+          turnedToMoney = true;
           spawnMoney(e.x, e.y, 10);
-          burst(e.x, e.y, "#ffe08a", 10);
-          burst(e.x, e.y, "#f0c040", 6);
+          burst(e.x, e.y, "#ffe08a", 14);
+          burst(e.x, e.y, "#f0c040", 8);
           break;
         }
       }
@@ -307,7 +313,7 @@
         dead = true;
       }
 
-      if (!dead && state.invuln <= 0 && hitTest(e, p)) {
+      if (!dead && state.invuln <= 0 && hitTest(e, p, 2)) {
         dead = true;
         state.lives -= 1;
         livesEl.textContent = String(state.lives);
@@ -331,28 +337,36 @@
       return pt.life > 0;
     });
 
-    // 金錢飄落／被戰機撿起
+    // 金錢：先浮現，再落下，需飛過去撿（不瞬間入袋）
     for (let i = state.moneys.length - 1; i >= 0; i -= 1) {
       const m = state.moneys[i];
       m.life += dt;
       m.spin += dt * 4;
-      m.vy += 40 * dt;
-      m.x += m.vx * dt;
-      m.y += m.vy * dt;
-      m.vx *= 0.98;
 
-      const transformDone = m.life > 0.25;
-      if (transformDone && hitTest(m, state.player)) {
+      if (m.life < m.floatTime) {
+        m.y += Math.sin(m.life * 12) * 0.4;
+      } else {
+        m.vy += 90 * dt;
+        m.x += m.vx * dt;
+        m.y += m.vy * dt;
+        m.vx *= 0.99;
+      }
+
+      m.x = clamp(m.x, 20, state.width - 20);
+
+      // 變身完成後才能撿；避開剛生成就與戰機重疊被立刻吃掉
+      if (m.life > 0.35 && hitTest(m, state.player, 4)) {
         collectMoney(m, i);
         continue;
       }
 
-      // 落地一陣子後自動入袋
-      if (m.y > state.height - 30) {
-        m.y = state.height - 30;
-        m.vy *= -0.2;
-        m.grounded = (m.grounded || 0) + dt;
-        if (m.grounded > 1.2) {
+      // 落到地面後停留，等玩家來撿；太久才自動入帳
+      if (m.y > state.height - 36) {
+        m.y = state.height - 36;
+        m.vy = 0;
+        m.vx *= 0.8;
+        m.grounded += dt;
+        if (m.grounded > 6) {
           collectMoney(m, i);
         }
       }
@@ -687,39 +701,44 @@
   }
 
   function drawMoney(m) {
-    const pop = Math.min(1, m.life * 4);
-    const scale = 0.35 + pop * 0.65;
+    const pop = Math.min(1, m.life * 5);
+    const scale = 0.55 + pop * 0.7;
     ctx.save();
     ctx.translate(m.x, m.y);
     ctx.rotate(Math.sin(m.spin) * 0.35);
     ctx.scale(scale, scale);
 
-    // 金幣
-    const g = ctx.createRadialGradient(-4, -4, 2, 0, 0, 16);
-    g.addColorStop(0, "#fff3a8");
+    // 金幣（加大，清楚可見）
+    ctx.fillStyle = "rgba(255, 210, 80, 0.35)";
+    ctx.beginPath();
+    ctx.arc(0, 0, 22, 0, Math.PI * 2);
+    ctx.fill();
+
+    const g = ctx.createRadialGradient(-5, -5, 2, 0, 0, 18);
+    g.addColorStop(0, "#fff8c8");
     g.addColorStop(0.55, "#ffd24a");
     g.addColorStop(1, "#c99312");
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.arc(0, 0, 14, 0, Math.PI * 2);
+    ctx.arc(0, 0, 16, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = "#a67810";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#8a6410";
+    ctx.lineWidth = 2.5;
     ctx.stroke();
 
-    ctx.fillStyle = "#a67810";
-    ctx.font = "bold 14px Zen Maru Gothic, sans-serif";
+    ctx.fillStyle = "#7a5808";
+    ctx.font = "bold 16px Zen Maru Gothic, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText("金", 0, 1);
 
-    // 剛變成金錢時的光暈
-    if (m.life < 0.45) {
-      ctx.globalAlpha = 1 - m.life / 0.45;
-      ctx.strokeStyle = "#ffe080";
-      ctx.lineWidth = 3;
+    // 剛從敵機變成金錢時的爆發光環
+    if (m.life < 0.55) {
+      ctx.globalAlpha = 1 - m.life / 0.55;
+      ctx.strokeStyle = "#fff2a0";
+      ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.arc(0, 0, 18 + m.life * 20, 0, Math.PI * 2);
+      ctx.arc(0, 0, 20 + m.life * 28, 0, Math.PI * 2);
       ctx.stroke();
     }
 
@@ -856,7 +875,6 @@
     drawBackground();
     drawBullets();
     state.enemies.forEach(drawEnemy);
-    state.moneys.forEach(drawMoney);
     drawPlayer();
     drawParticles();
 
@@ -866,6 +884,9 @@
     haze.addColorStop(1, "rgba(255, 230, 190, 0.18)");
     ctx.fillStyle = haze;
     ctx.fillRect(0, state.height * 0.45, state.width, state.height * 0.55);
+
+    // 金錢畫在霧之上，避免看不見、無法去撿
+    state.moneys.forEach(drawMoney);
   }
 
   function loop(ts) {
