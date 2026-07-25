@@ -86,8 +86,8 @@
     ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
 
     if (state.player) {
-      state.player.x = clamp(state.player.x, 28, state.width - 28);
-      state.player.y = clamp(state.player.y, state.height * 0.55, state.height - 40);
+      state.player.x = clamp(state.player.x, 44, state.width - 44);
+      state.player.y = clamp(state.player.y, state.height * 0.5, state.height - 56);
     }
 
     if (state.running) {
@@ -344,15 +344,15 @@
       p.y += (my / len) * p.speed * dt;
     }
 
-    p.x = clamp(p.x, 28, state.width - 28);
-    p.y = clamp(p.y, state.height * 0.52, state.height - 36);
+    p.x = clamp(p.x, 44, state.width - 44);
+    p.y = clamp(p.y, state.height * 0.5, state.height - 56);
 
     state.shootCooldown -= dt;
     if (state.shootCooldown <= 0) {
       // 小鴨鴨炸彈（碰撞箱對齊畫面大小）
       state.bullets.push({
         x: p.x,
-        y: p.y - 28,
+        y: p.y - 48,
         w: 30,
         h: 30,
         speed: 420,
@@ -1098,7 +1098,7 @@
     const pos = pointerPos(event);
     if (!pos) return;
     state.pointerX = pos.x;
-    state.player.y = clamp(pos.y, state.height * 0.52, state.height - 36);
+    state.player.y = clamp(pos.y, state.height * 0.5, state.height - 56);
     event.preventDefault();
   }
 
