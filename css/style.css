@@ -272,7 +272,7 @@ body {
 
 /* —— 遊戲 HUD —— */
 #game-screen {
-  background: linear-gradient(180deg, #08284f 0%, #1a6bb5 48%, #6eb6ef 100%);
+  background: linear-gradient(180deg, #8b6a3f 0%, #d2a66a 42%, #e8c48a 100%);
 }
 
 .hud {

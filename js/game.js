@@ -25,7 +25,9 @@
     bullets: [],
     enemies: [],
     particles: [],
-    clouds: [],
+    fogBands: [],
+    dunes: [],
+    desertDucks: [],
     keys: Object.create(null),
     pointerActive: false,
     pointerX: 0,
@@ -35,6 +37,7 @@
     raf: 0,
     lastTs: 0,
     hintTimer: 0,
+    sandOffset: 0,
   };
 
   function showScreen(screen) {
@@ -61,6 +64,10 @@
       state.player.x = clamp(state.player.x, 28, state.width - 28);
       state.player.y = clamp(state.player.y, state.height * 0.55, state.height - 40);
     }
+
+    if (state.running) {
+      layoutDesertProps();
+    }
   }
 
   function clamp(v, min, max) {
@@ -71,13 +78,30 @@
     return min + Math.random() * (max - min);
   }
 
-  function createClouds() {
-    state.clouds = Array.from({ length: 6 }, () => ({
-      x: rand(0, state.width),
-      y: rand(40, state.height * 0.7),
-      w: rand(60, 140),
-      speed: rand(12, 36),
-      alpha: rand(0.2, 0.45),
+  function layoutDesertProps() {
+    const groundY = state.height * 0.72;
+    // 五隻沙漠鴨鴨，固定分佈在沙地上
+    const slots = [0.12, 0.3, 0.5, 0.7, 0.88];
+    state.desertDucks = slots.map((t, i) => ({
+      x: state.width * t,
+      y: groundY + rand(8, 36) + (i % 2) * 10,
+      scale: rand(0.85, 1.15),
+      bob: rand(0, Math.PI * 2),
+      facing: i % 2 === 0 ? 1 : -1,
+    }));
+
+    state.dunes = [
+      { y: state.height * 0.55, amp: 28, color: "#c99555" },
+      { y: state.height * 0.68, amp: 36, color: "#d9a86a" },
+      { y: state.height * 0.82, amp: 44, color: "#e6b87a" },
+    ];
+
+    state.fogBands = Array.from({ length: 5 }, (_, i) => ({
+      y: state.height * (0.2 + i * 0.14),
+      h: rand(40, 80),
+      speed: rand(8, 22) * (i % 2 === 0 ? 1 : -1),
+      offset: rand(0, 400),
+      alpha: 0.12 + i * 0.03,
     }));
   }
 
@@ -91,18 +115,19 @@
     state.spawnTimer = 0.6;
     state.invuln = 1.2;
     state.lastTs = 0;
-    state.hintTimer = 4;
+    state.hintTimer = 4.5;
+    state.sandOffset = 0;
     hintEl.classList.remove("is-faded");
     scoreEl.textContent = "0";
     livesEl.textContent = "3";
     state.player = {
       x: state.width / 2,
       y: state.height - 72,
-      w: 46,
-      h: 34,
+      w: 52,
+      h: 40,
       speed: 320,
     };
-    createClouds();
+    layoutDesertProps();
   }
 
   function startGame() {
@@ -178,7 +203,6 @@
     if (state.pointerActive) {
       const dx = state.pointerX - p.x;
       mx = clamp(dx / 40, -1, 1);
-      // 指標操作時維持高度帶，略微跟隨垂直可選：略微上移手感
       my = 0;
     }
 
@@ -193,19 +217,23 @@
 
     state.shootCooldown -= dt;
     if (state.shootCooldown <= 0) {
+      // 小鴨鴨炸彈
       state.bullets.push({
         x: p.x,
-        y: p.y - 22,
-        w: 4,
-        h: 12,
-        speed: 520,
+        y: p.y - 26,
+        w: 18,
+        h: 18,
+        speed: 420,
+        spin: rand(0, Math.PI * 2),
+        spinSpeed: rand(6, 10),
       });
-      state.shootCooldown = 0.18;
+      state.shootCooldown = 0.28;
     }
 
     state.bullets = state.bullets.filter((b) => {
       b.y -= b.speed * dt;
-      return b.y > -20;
+      b.spin += b.spinSpeed * dt;
+      return b.y > -30;
     });
 
     state.spawnTimer -= dt;
@@ -233,7 +261,8 @@
           dead = true;
           state.score += 10;
           scoreEl.textContent = String(state.score);
-          burst(e.x, e.y, "#ffb36b", 12);
+          burst(e.x, e.y, "#ffd36b", 12);
+          burst(e.x, e.y, "#f0c040", 6);
           break;
         }
       }
@@ -247,7 +276,7 @@
         state.lives -= 1;
         livesEl.textContent = String(state.lives);
         state.invuln = 1.5;
-        burst(p.x, p.y, "#7ec8ff", 16);
+        burst(p.x, p.y, "#7dba5a", 16);
         if (state.lives <= 0) {
           endGame();
           return;
@@ -266,13 +295,15 @@
       return pt.life > 0;
     });
 
-    state.clouds.forEach((c) => {
-      c.x += c.speed * dt;
-      if (c.x - c.w > state.width) {
-        c.x = -c.w;
-        c.y = rand(40, state.height * 0.7);
-      }
+    state.fogBands.forEach((f) => {
+      f.offset += f.speed * dt;
     });
+
+    state.desertDucks.forEach((d) => {
+      d.bob += dt * 2.2;
+    });
+
+    state.sandOffset += 40 * dt;
 
     if (state.invuln > 0) state.invuln -= dt;
 
@@ -282,42 +313,190 @@
     }
   }
 
-  function drawBackground() {
-    const g = ctx.createLinearGradient(0, 0, 0, state.height);
-    g.addColorStop(0, "#08284f");
-    g.addColorStop(0.45, "#1a6bb5");
-    g.addColorStop(1, "#8ec8f2");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, state.width, state.height);
+  function drawDuck(x, y, scale = 1, facing = 1, options = {}) {
+    const { pilot = false, bomb = false } = options;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale * facing, scale);
 
-    // 太陽
-    const sunX = state.width * 0.82;
-    const sunY = state.height * 0.14;
-    const sunR = Math.min(state.width, state.height) * 0.07;
-    const sunGrad = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR * 2.2);
-    sunGrad.addColorStop(0, "rgba(255, 240, 190, 0.95)");
-    sunGrad.addColorStop(0.4, "rgba(255, 210, 120, 0.55)");
-    sunGrad.addColorStop(1, "rgba(255, 210, 120, 0)");
-    ctx.fillStyle = sunGrad;
+    // 身體
+    ctx.fillStyle = bomb ? "#f2d24b" : "#ffe56a";
     ctx.beginPath();
-    ctx.arc(sunX, sunY, sunR * 2.2, 0, Math.PI * 2);
+    ctx.ellipse(0, 2, 10, 8, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    state.clouds.forEach((c) => {
-      ctx.globalAlpha = c.alpha;
-      ctx.fillStyle = "#ffffff";
-      roundCloud(c.x, c.y, c.w);
-    });
-    ctx.globalAlpha = 1;
+    // 頭
+    ctx.beginPath();
+    ctx.arc(8, -4, 6.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 翅膀
+    ctx.fillStyle = bomb ? "#e6c43d" : "#f0d255";
+    ctx.beginPath();
+    ctx.ellipse(-2, 2, 5, 3.5, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 嘴巴
+    ctx.fillStyle = "#f0872a";
+    ctx.beginPath();
+    ctx.moveTo(13, -4);
+    ctx.lineTo(19, -2);
+    ctx.lineTo(13, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    // 眼睛
+    ctx.fillStyle = "#2a2a2a";
+    ctx.beginPath();
+    ctx.arc(10, -5.5, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (pilot) {
+      // 小飛行帽
+      ctx.fillStyle = "#3d6b2e";
+      ctx.beginPath();
+      ctx.ellipse(7, -9, 5, 2.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#c23b2a";
+      ctx.beginPath();
+      ctx.arc(7, -11, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    if (bomb) {
+      // 炸彈引信
+      ctx.strokeStyle = "#5a4030";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(-8, -4);
+      ctx.quadraticCurveTo(-12, -10, -8, -12);
+      ctx.stroke();
+      ctx.fillStyle = "#ff8a3a";
+      ctx.beginPath();
+      ctx.arc(-8, -12, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
   }
 
-  function roundCloud(x, y, w) {
-    const h = w * 0.35;
+  function drawPalmWing(side) {
+    // 手掌大小的機翼，帶手掌紋理
+    ctx.save();
+    ctx.scale(side, 1);
+
+    ctx.fillStyle = "#3f8f3a";
     ctx.beginPath();
-    ctx.ellipse(x, y, w * 0.5, h * 0.55, 0, 0, Math.PI * 2);
-    ctx.ellipse(x - w * 0.25, y + 4, w * 0.28, h * 0.45, 0, 0, Math.PI * 2);
-    ctx.ellipse(x + w * 0.28, y + 2, w * 0.3, h * 0.42, 0, 0, Math.PI * 2);
+    ctx.moveTo(4, 2);
+    ctx.quadraticCurveTo(18, -2, 26, 4);
+    ctx.quadraticCurveTo(22, 12, 10, 12);
+    ctx.quadraticCurveTo(6, 10, 4, 6);
+    ctx.closePath();
     ctx.fill();
+
+    // 手掌輪廓
+    ctx.fillStyle = "#2f6f2c";
+    ctx.beginPath();
+    ctx.ellipse(16, 6, 7, 5.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 五指
+    const fingers = [
+      [11, 1, -0.5],
+      [14, -1, -0.15],
+      [17, -1.5, 0.1],
+      [20, -0.5, 0.35],
+      [22, 3, 0.9],
+    ];
+    fingers.forEach(([fx, fy, rot]) => {
+      ctx.save();
+      ctx.translate(fx, fy);
+      ctx.rotate(rot);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 2.2, 4.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+
+    // 掌心亮點
+    ctx.fillStyle = "rgba(180, 220, 140, 0.35)";
+    ctx.beginPath();
+    ctx.ellipse(15, 7, 3, 2.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawDecalDuck(x, y, s = 0.45) {
+    drawDuck(x, y, s, 1, {});
+  }
+
+  function drawBackground() {
+    // 沙漠天空
+    const sky = ctx.createLinearGradient(0, 0, 0, state.height);
+    sky.addColorStop(0, "#f0c98a");
+    sky.addColorStop(0.35, "#e8b56a");
+    sky.addColorStop(0.55, "#d7a05a");
+    sky.addColorStop(1, "#c48a48");
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, state.width, state.height);
+
+    // 烈日
+    const sunX = state.width * 0.78;
+    const sunY = state.height * 0.16;
+    const sunR = Math.min(state.width, state.height) * 0.09;
+    const sunGrad = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR * 2);
+    sunGrad.addColorStop(0, "rgba(255, 245, 200, 0.95)");
+    sunGrad.addColorStop(0.35, "rgba(255, 190, 90, 0.7)");
+    sunGrad.addColorStop(1, "rgba(255, 170, 70, 0)");
+    ctx.fillStyle = sunGrad;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, sunR * 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 沙丘
+    state.dunes.forEach((dune, idx) => {
+      ctx.fillStyle = dune.color;
+      ctx.beginPath();
+      ctx.moveTo(0, state.height);
+      for (let x = 0; x <= state.width; x += 12) {
+        const y =
+          dune.y +
+          Math.sin((x + state.sandOffset * (0.3 + idx * 0.15)) * 0.02) * dune.amp +
+          Math.sin((x * 0.01) + idx) * 10;
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(state.width, state.height);
+      ctx.closePath();
+      ctx.fill();
+    });
+
+    // 沙漠裡的五隻鴨鴨
+    state.desertDucks.forEach((d) => {
+      const bobY = Math.sin(d.bob) * 3;
+      drawDuck(d.x, d.y + bobY, d.scale, d.facing, {});
+    });
+
+    // 霧濛層
+    state.fogBands.forEach((f) => {
+      const grad = ctx.createLinearGradient(0, f.y, 0, f.y + f.h);
+      grad.addColorStop(0, `rgba(255, 236, 200, 0)`);
+      grad.addColorStop(0.5, `rgba(255, 230, 190, ${f.alpha})`);
+      grad.addColorStop(1, `rgba(255, 236, 200, 0)`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, f.y, state.width, f.h);
+
+      // 飄移霧團
+      ctx.globalAlpha = f.alpha * 1.4;
+      ctx.fillStyle = "rgba(255, 240, 210, 0.85)";
+      for (let i = 0; i < 3; i += 1) {
+        const fx = ((f.offset * 8 + i * 180) % (state.width + 200)) - 100;
+        ctx.beginPath();
+        ctx.ellipse(fx, f.y + f.h * 0.5, 90, 18, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    });
   }
 
   function drawPlayer() {
@@ -329,52 +508,65 @@
     ctx.translate(p.x, p.y);
 
     // 尾焰
-    ctx.fillStyle = "rgba(255, 180, 80, 0.85)";
+    ctx.fillStyle = "rgba(255, 170, 70, 0.9)";
     ctx.beginPath();
-    ctx.moveTo(-6, 16);
-    ctx.lineTo(0, 28 + Math.sin(performance.now() / 50) * 4);
-    ctx.lineTo(6, 16);
+    ctx.moveTo(-5, 18);
+    ctx.lineTo(0, 30 + Math.sin(performance.now() / 45) * 5);
+    ctx.lineTo(5, 18);
     ctx.fill();
 
-    // 機翼
-    ctx.fillStyle = "#d7e2ee";
-    ctx.beginPath();
-    ctx.moveTo(-4, 0);
-    ctx.lineTo(-28, 14);
-    ctx.lineTo(-8, 12);
-    ctx.closePath();
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(4, 0);
-    ctx.lineTo(28, 14);
-    ctx.lineTo(8, 12);
-    ctx.closePath();
-    ctx.fill();
+    // 手掌大的雙翼
+    drawPalmWing(-1);
+    drawPalmWing(1);
 
-    // 機身
-    const body = ctx.createLinearGradient(0, -18, 0, 18);
-    body.addColorStop(0, "#f7fbff");
-    body.addColorStop(1, "#8fa3b8");
+    // 綠色戰機機身
+    const body = ctx.createLinearGradient(-14, 0, 14, 0);
+    body.addColorStop(0, "#2f6b2a");
+    body.addColorStop(0.5, "#4aa143");
+    body.addColorStop(1, "#2a5f28");
     ctx.fillStyle = body;
     ctx.beginPath();
-    ctx.moveTo(0, -20);
-    ctx.quadraticCurveTo(12, -4, 8, 16);
-    ctx.lineTo(-8, 16);
-    ctx.quadraticCurveTo(-12, -4, 0, -20);
+    ctx.moveTo(0, -24);
+    ctx.quadraticCurveTo(14, -2, 10, 18);
+    ctx.lineTo(-10, 18);
+    ctx.quadraticCurveTo(-14, -2, 0, -24);
     ctx.fill();
 
-    // 座艙
-    ctx.fillStyle = "#3f8fd4";
+    // 機身線條
+    ctx.strokeStyle = "rgba(20, 60, 20, 0.35)";
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.ellipse(0, -6, 5, 7, 0, 0, Math.PI * 2);
+    ctx.moveTo(0, -20);
+    ctx.lineTo(0, 16);
+    ctx.stroke();
+
+    // 機身上五隻小鴨圖案
+    const decals = [
+      [0, -14],
+      [-5, -4],
+      [5, -4],
+      [-4, 6],
+      [4, 6],
+    ];
+    decals.forEach(([dx, dy]) => drawDecalDuck(dx, dy, 0.38));
+
+    // 座艙玻璃
+    ctx.fillStyle = "rgba(160, 220, 255, 0.55)";
+    ctx.beginPath();
+    ctx.ellipse(0, -8, 7, 8, 0, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = "rgba(30, 80, 40, 0.5)";
+    ctx.stroke();
+
+    // 誰在開飛機？小鴨鴨！
+    drawDuck(0, -9, 0.55, 1, { pilot: true });
 
     // 鼻錐
-    ctx.fillStyle = "#d6452d";
+    ctx.fillStyle = "#245522";
     ctx.beginPath();
-    ctx.moveTo(0, -20);
-    ctx.lineTo(4, -12);
-    ctx.lineTo(-4, -12);
+    ctx.moveTo(0, -24);
+    ctx.lineTo(5, -14);
+    ctx.lineTo(-5, -14);
     ctx.closePath();
     ctx.fill();
 
@@ -385,7 +577,7 @@
     ctx.save();
     ctx.translate(e.x, e.y);
 
-    ctx.fillStyle = "#3a4454";
+    ctx.fillStyle = "#5a4030";
     ctx.beginPath();
     ctx.moveTo(0, 16);
     ctx.lineTo(18, -6);
@@ -396,7 +588,7 @@
     ctx.closePath();
     ctx.fill();
 
-    ctx.fillStyle = "#c23b2a";
+    ctx.fillStyle = "#a84b2a";
     ctx.beginPath();
     ctx.moveTo(0, 16);
     ctx.lineTo(5, 6);
@@ -404,7 +596,7 @@
     ctx.closePath();
     ctx.fill();
 
-    ctx.fillStyle = "#6ec0ff";
+    ctx.fillStyle = "#efc36a";
     ctx.beginPath();
     ctx.ellipse(0, -2, 4, 5, 0, 0, Math.PI * 2);
     ctx.fill();
@@ -413,11 +605,12 @@
   }
 
   function drawBullets() {
-    ctx.fillStyle = "#ffe08a";
     state.bullets.forEach((b) => {
-      ctx.beginPath();
-      ctx.roundRect(b.x - b.w / 2, b.y - b.h / 2, b.w, b.h, 2);
-      ctx.fill();
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.spin);
+      drawDuck(0, 0, 0.85, 1, { bomb: true });
+      ctx.restore();
     });
   }
 
@@ -434,10 +627,18 @@
 
   function draw() {
     drawBackground();
+    // 沙漠鴨鴨在背景層，戰機與子彈在前景
     drawBullets();
     state.enemies.forEach(drawEnemy);
     drawPlayer();
     drawParticles();
+
+    // 近景薄霧，強化霧濛感
+    const haze = ctx.createLinearGradient(0, state.height * 0.45, 0, state.height);
+    haze.addColorStop(0, "rgba(255, 236, 200, 0)");
+    haze.addColorStop(1, "rgba(255, 230, 190, 0.18)");
+    ctx.fillStyle = haze;
+    ctx.fillRect(0, state.height * 0.45, state.width, state.height * 0.55);
   }
 
   function loop(ts) {
@@ -475,7 +676,6 @@
     const pos = pointerPos(event);
     if (!pos) return;
     state.pointerX = pos.x;
-    // 觸控時也允許微調高度
     state.player.y = clamp(pos.y, state.height * 0.52, state.height - 36);
     event.preventDefault();
   }
@@ -514,20 +714,6 @@
   canvas.addEventListener("touchmove", onPointerMove, { passive: false });
   canvas.addEventListener("touchend", onPointerUp);
   canvas.addEventListener("touchcancel", onPointerUp);
-
-  // roundRect polyfill for older mobile browsers
-  if (!CanvasRenderingContext2D.prototype.roundRect) {
-    CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
-      const radius = typeof r === "number" ? r : 0;
-      this.moveTo(x + radius, y);
-      this.arcTo(x + w, y, x + w, y + h, radius);
-      this.arcTo(x + w, y + h, x, y + h, radius);
-      this.arcTo(x, y + h, x, y, radius);
-      this.arcTo(x, y, x + w, y, radius);
-      this.closePath();
-      return this;
-    };
-  }
 
   showScreen(titleScreen);
 })();
