@@ -25,9 +25,11 @@
     bullets: [],
     enemies: [],
     particles: [],
+    moneys: [],
     fogBands: [],
     dunes: [],
-    desertDucks: [],
+    desertDuck: null,
+    ultraman: null,
     keys: Object.create(null),
     pointerActive: false,
     pointerX: 0,
@@ -79,16 +81,25 @@
   }
 
   function layoutDesertProps() {
-    const groundY = state.height * 0.72;
-    // 五隻沙漠鴨鴨，固定分佈在沙地上
-    const slots = [0.12, 0.3, 0.5, 0.7, 0.88];
-    state.desertDucks = slots.map((t, i) => ({
-      x: state.width * t,
-      y: groundY + rand(8, 36) + (i % 2) * 10,
-      scale: rand(0.85, 1.15),
-      bob: rand(0, Math.PI * 2),
-      facing: i % 2 === 0 ? 1 : -1,
-    }));
+    const groundY = state.height * 0.74;
+
+    // 沙漠裡有一隻鴨鴨
+    state.desertDuck = {
+      x: state.width * 0.22,
+      y: groundY + 18,
+      scale: 1.15,
+      bob: 0,
+      facing: 1,
+    };
+
+    // 沙漠裡有奧特曼
+    state.ultraman = {
+      x: state.width * 0.72,
+      y: groundY + 8,
+      scale: Math.min(1.35, state.width / 320),
+      bob: 0,
+      armPhase: 0,
+    };
 
     state.dunes = [
       { y: state.height * 0.55, amp: 28, color: "#c99555" },
@@ -111,6 +122,7 @@
     state.bullets = [];
     state.enemies = [];
     state.particles = [];
+    state.moneys = [];
     state.shootCooldown = 0;
     state.spawnTimer = 0.6;
     state.invuln = 1.2;
@@ -181,6 +193,30 @@
         size: rand(2, 5),
       });
     }
+  }
+
+  function spawnMoney(x, y, value) {
+    state.moneys.push({
+      x,
+      y,
+      w: 28,
+      h: 28,
+      vx: rand(-40, 40),
+      vy: rand(-80, -30),
+      value,
+      spin: 0,
+      life: 0,
+      grounded: 0,
+      pop: 0,
+    });
+  }
+
+  function collectMoney(m, index) {
+    state.score += m.value;
+    scoreEl.textContent = String(state.score);
+    burst(m.x, m.y, "#ffd700", 8);
+    burst(m.x, m.y, "#fff3a0", 4);
+    state.moneys.splice(index, 1);
   }
 
   function hitTest(a, b) {
@@ -259,9 +295,9 @@
         if (hitTest(e, b)) {
           state.bullets.splice(j, 1);
           dead = true;
-          state.score += 10;
-          scoreEl.textContent = String(state.score);
-          burst(e.x, e.y, "#ffd36b", 12);
+          // 敵機被小鴨炸彈射中 → 變成金錢
+          spawnMoney(e.x, e.y, 10);
+          burst(e.x, e.y, "#ffe08a", 10);
           burst(e.x, e.y, "#f0c040", 6);
           break;
         }
@@ -295,13 +331,42 @@
       return pt.life > 0;
     });
 
+    // 金錢飄落／被戰機撿起
+    for (let i = state.moneys.length - 1; i >= 0; i -= 1) {
+      const m = state.moneys[i];
+      m.life += dt;
+      m.spin += dt * 4;
+      m.vy += 40 * dt;
+      m.x += m.vx * dt;
+      m.y += m.vy * dt;
+      m.vx *= 0.98;
+
+      const transformDone = m.life > 0.25;
+      if (transformDone && hitTest(m, state.player)) {
+        collectMoney(m, i);
+        continue;
+      }
+
+      // 落地一陣子後自動入袋
+      if (m.y > state.height - 30) {
+        m.y = state.height - 30;
+        m.vy *= -0.2;
+        m.grounded = (m.grounded || 0) + dt;
+        if (m.grounded > 1.2) {
+          collectMoney(m, i);
+        }
+      }
+    }
+
     state.fogBands.forEach((f) => {
       f.offset += f.speed * dt;
     });
 
-    state.desertDucks.forEach((d) => {
-      d.bob += dt * 2.2;
-    });
+    if (state.desertDuck) state.desertDuck.bob += dt * 2.2;
+    if (state.ultraman) {
+      state.ultraman.bob += dt * 1.6;
+      state.ultraman.armPhase += dt * 2.5;
+    }
 
     state.sandOffset += 40 * dt;
 
@@ -471,11 +536,17 @@
       ctx.fill();
     });
 
-    // 沙漠裡的五隻鴨鴨
-    state.desertDucks.forEach((d) => {
-      const bobY = Math.sin(d.bob) * 3;
-      drawDuck(d.x, d.y + bobY, d.scale, d.facing, {});
-    });
+    // 沙漠裡的奧特曼
+    if (state.ultraman) {
+      const u = state.ultraman;
+      drawUltraman(u.x, u.y + Math.sin(u.bob) * 2, u.scale, u.armPhase);
+    }
+
+    // 沙漠裡還有一隻鴨鴨
+    if (state.desertDuck) {
+      const d = state.desertDuck;
+      drawDuck(d.x, d.y + Math.sin(d.bob) * 3, d.scale, d.facing, {});
+    }
 
     // 霧濛層
     state.fogBands.forEach((f) => {
@@ -497,6 +568,153 @@
       }
       ctx.globalAlpha = 1;
     });
+  }
+
+  function drawUltraman(x, y, scale = 1, armPhase = 0) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+
+    const armLift = Math.sin(armPhase) * 0.35;
+
+    // 腿
+    ctx.fillStyle = "#d8dde4";
+    ctx.fillRect(-9, 18, 7, 22);
+    ctx.fillRect(2, 18, 7, 22);
+    ctx.fillStyle = "#c23b2a";
+    ctx.fillRect(-9, 28, 7, 5);
+    ctx.fillRect(2, 28, 7, 5);
+
+    // 身體（銀＋紅）
+    ctx.fillStyle = "#e8edf2";
+    ctx.beginPath();
+    ctx.roundRect(-12, -8, 24, 28, 4);
+    ctx.fill();
+
+    // 紅色線條／腹甲
+    ctx.fillStyle = "#c23b2a";
+    ctx.fillRect(-12, 2, 24, 5);
+    ctx.fillRect(-3, -8, 6, 28);
+
+    // 彩色計時器
+    ctx.fillStyle = "#f0d24a";
+    ctx.beginPath();
+    ctx.arc(0, 4.5, 4.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#8a6a10";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // 手臂（經典舉手姿勢微動）
+    ctx.save();
+    ctx.translate(-12, -2);
+    ctx.rotate(-0.9 + armLift);
+    ctx.fillStyle = "#e8edf2";
+    ctx.fillRect(-4, 0, 6, 20);
+    ctx.fillStyle = "#c23b2a";
+    ctx.fillRect(-4, 14, 6, 4);
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(12, -2);
+    ctx.rotate(0.9 - armLift);
+    ctx.fillStyle = "#e8edf2";
+    ctx.fillRect(-2, 0, 6, 20);
+    ctx.fillStyle = "#c23b2a";
+    ctx.fillRect(-2, 14, 6, 4);
+    ctx.restore();
+
+    // 頭
+    ctx.fillStyle = "#e8edf2";
+    ctx.beginPath();
+    ctx.ellipse(0, -18, 11, 13, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 頭冠
+    ctx.fillStyle = "#c23b2a";
+    ctx.beginPath();
+    ctx.moveTo(0, -34);
+    ctx.lineTo(5, -22);
+    ctx.lineTo(-5, -22);
+    ctx.closePath();
+    ctx.fill();
+
+    // 耳朵飾
+    ctx.fillStyle = "#c23b2a";
+    ctx.beginPath();
+    ctx.moveTo(-11, -20);
+    ctx.lineTo(-18, -16);
+    ctx.lineTo(-11, -12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(11, -20);
+    ctx.lineTo(18, -16);
+    ctx.lineTo(11, -12);
+    ctx.closePath();
+    ctx.fill();
+
+    // 眼睛（亮黃）
+    ctx.fillStyle = "#ffe14a";
+    ctx.beginPath();
+    ctx.ellipse(-4.5, -18, 3.2, 4.5, -0.15, 0, Math.PI * 2);
+    ctx.ellipse(4.5, -18, 3.2, 4.5, 0.15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+    ctx.beginPath();
+    ctx.ellipse(-5.2, -19.5, 1.1, 1.6, 0, 0, Math.PI * 2);
+    ctx.ellipse(3.8, -19.5, 1.1, 1.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 嘴線
+    ctx.strokeStyle = "#9aa3ad";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-3, -12);
+    ctx.lineTo(3, -12);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function drawMoney(m) {
+    const pop = Math.min(1, m.life * 4);
+    const scale = 0.35 + pop * 0.65;
+    ctx.save();
+    ctx.translate(m.x, m.y);
+    ctx.rotate(Math.sin(m.spin) * 0.35);
+    ctx.scale(scale, scale);
+
+    // 金幣
+    const g = ctx.createRadialGradient(-4, -4, 2, 0, 0, 16);
+    g.addColorStop(0, "#fff3a8");
+    g.addColorStop(0.55, "#ffd24a");
+    g.addColorStop(1, "#c99312");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#a67810";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = "#a67810";
+    ctx.font = "bold 14px Zen Maru Gothic, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("金", 0, 1);
+
+    // 剛變成金錢時的光暈
+    if (m.life < 0.45) {
+      ctx.globalAlpha = 1 - m.life / 0.45;
+      ctx.strokeStyle = "#ffe080";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, 18 + m.life * 20, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    ctx.restore();
   }
 
   function drawPlayer() {
@@ -627,9 +845,9 @@
 
   function draw() {
     drawBackground();
-    // 沙漠鴨鴨在背景層，戰機與子彈在前景
     drawBullets();
     state.enemies.forEach(drawEnemy);
+    state.moneys.forEach(drawMoney);
     drawPlayer();
     drawParticles();
 
