@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#1a6bb5" />
+  <title>蒼穹戰機</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;700&family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- 主畫面 -->
+    <section id="title-screen" class="screen is-active" aria-label="主畫面">
+      <div class="sky" aria-hidden="true">
+        <div class="sky-glow"></div>
+        <div class="sun"></div>
+        <div class="cloud cloud-a"></div>
+        <div class="cloud cloud-b"></div>
+        <div class="cloud cloud-c"></div>
+        <div class="cloud cloud-d"></div>
+        <div class="plane-scene">
+          <div class="plane-wake"></div>
+          <svg class="hero-plane" viewBox="0 0 240 120" role="img" aria-label="飛行中的戰機">
+            <defs>
+              <linearGradient id="fuselage" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#dfe7ef" />
+                <stop offset="45%" stop-color="#f7fbff" />
+                <stop offset="100%" stop-color="#9eb0c4" />
+              </linearGradient>
+              <linearGradient id="wing" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#f4f7fb" />
+                <stop offset="100%" stop-color="#7f93ab" />
+              </linearGradient>
+              <linearGradient id="cockpit" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#7ec8ff" />
+                <stop offset="100%" stop-color="#1f5f9a" />
+              </linearGradient>
+            </defs>
+            <!-- 機翼 -->
+            <path fill="url(#wing)" d="M78 58 L28 92 L52 96 L118 72 Z" />
+            <path fill="url(#wing)" d="M78 52 L22 18 L46 16 L118 48 Z" />
+            <!-- 機身 -->
+            <path fill="url(#fuselage)" d="M36 55 C60 42, 120 40, 188 52 C206 56, 214 60, 220 64 C214 68, 206 72, 188 76 C120 88, 60 86, 36 73 C28 68, 28 60, 36 55 Z" />
+            <!-- 座艙 -->
+            <ellipse cx="150" cy="60" rx="22" ry="10" fill="url(#cockpit)" opacity="0.95" />
+            <!-- 尾翼 -->
+            <path fill="#c5d0dc" d="M48 48 L30 28 L42 34 L58 52 Z" />
+            <path fill="#b7c3d1" d="M48 80 L30 100 L42 94 L58 76 Z" />
+            <!-- 進氣口／鼻錐強調 -->
+            <path fill="#c23b2a" d="M198 56 C210 60, 214 62, 218 64 C214 66, 210 68, 198 72 C204 64, 204 64, 198 56 Z" />
+            <!-- 機槍線條 -->
+            <rect x="175" y="50" width="18" height="2.2" rx="1" fill="#5a6b7d" />
+            <rect x="175" y="76" width="18" height="2.2" rx="1" fill="#5a6b7d" />
+          </svg>
+        </div>
+      </div>
+
+      <div class="title-content">
+        <h1 class="brand">蒼穹戰機</h1>
+        <p class="tagline">衝上藍天，擊落來犯之敵</p>
+        <button type="button" id="btn-start" class="btn-start">開始遊戲</button>
+      </div>
+    </section>
+
+    <!-- 遊戲畫面 -->
+    <section id="game-screen" class="screen" aria-label="遊戲畫面" hidden>
+      <header class="hud" aria-live="polite">
+        <div class="hud-item">分數 <span id="score">0</span></div>
+        <div class="hud-item">生命 <span id="lives">3</span></div>
+      </header>
+      <canvas id="game-canvas" aria-label="遊戲畫布"></canvas>
+      <p class="hint" id="control-hint">拖曳或方向鍵移動 · 自動射擊</p>
+    </section>
+
+    <!-- 結束畫面 -->
+    <section id="over-screen" class="screen" aria-label="遊戲結束" hidden>
+      <div class="overlay-panel">
+        <h2>任務結束</h2>
+        <p>最終分數 <span id="final-score">0</span></p>
+        <button type="button" id="btn-again" class="btn-start">再來一局</button>
+        <button type="button" id="btn-menu" class="btn-secondary">返回主畫面</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="js/game.js"></script>
+</body>
+</html>

@@ -1,0 +1,482 @@
+:root {
+  --sky-top: #0b3d7a;
+  --sky-mid: #1a6bb5;
+  --sky-low: #6eb6ef;
+  --sky-horizon: #c9e8ff;
+  --sun: #ffe29a;
+  --ink: #0e2744;
+  --foam: #f4f9ff;
+  --accent: #d6452d;
+  --accent-deep: #a8321f;
+  --panel: rgba(8, 28, 52, 0.72);
+  --font-display: "Noto Serif TC", "Songti TC", serif;
+  --font-ui: "Zen Maru Gothic", "PingFang TC", "Noto Sans TC", sans-serif;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--sky-mid);
+  color: var(--foam);
+  font-family: var(--font-ui);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  user-select: none;
+}
+
+#app,
+.screen {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.screen {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.45s ease, visibility 0.45s ease;
+}
+
+.screen.is-active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.screen[hidden] {
+  display: block;
+}
+
+/* —— 主畫面天空 —— */
+.sky {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 50% 120%, var(--sky-horizon) 0%, transparent 55%),
+    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 42%, var(--sky-low) 100%);
+}
+
+.sky-glow {
+  position: absolute;
+  inset: -10% 0 auto;
+  height: 55%;
+  background: radial-gradient(ellipse at 70% 20%, rgba(255, 236, 180, 0.35), transparent 60%);
+  animation: glow-drift 12s ease-in-out infinite alternate;
+}
+
+.sun {
+  position: absolute;
+  top: 10%;
+  right: 14%;
+  width: clamp(56px, 12vw, 110px);
+  height: clamp(56px, 12vw, 110px);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff8df, var(--sun) 45%, rgba(255, 196, 90, 0.2) 70%, transparent 72%);
+  filter: blur(0.2px);
+  animation: sun-pulse 6s ease-in-out infinite;
+}
+
+.cloud {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.88);
+  border-radius: 999px;
+  filter: blur(0.3px);
+  box-shadow:
+    28px 8px 0 -4px rgba(255, 255, 255, 0.85),
+    52px 2px 0 -10px rgba(255, 255, 255, 0.8),
+    18px -12px 0 -6px rgba(255, 255, 255, 0.78);
+  opacity: 0.85;
+  animation: cloud-drift linear infinite;
+}
+
+.cloud-a {
+  width: 90px;
+  height: 34px;
+  top: 18%;
+  left: -20%;
+  animation-duration: 38s;
+}
+
+.cloud-b {
+  width: 130px;
+  height: 42px;
+  top: 34%;
+  left: -30%;
+  opacity: 0.7;
+  animation-duration: 52s;
+  animation-delay: -12s;
+}
+
+.cloud-c {
+  width: 70px;
+  height: 28px;
+  top: 58%;
+  left: -15%;
+  opacity: 0.55;
+  animation-duration: 44s;
+  animation-delay: -22s;
+}
+
+.cloud-d {
+  width: 110px;
+  height: 36px;
+  top: 72%;
+  left: -25%;
+  opacity: 0.45;
+  animation-duration: 60s;
+  animation-delay: -8s;
+}
+
+.plane-scene {
+  position: absolute;
+  left: 0;
+  top: 42%;
+  width: 100%;
+  height: 0;
+  animation: plane-cruise 16s linear infinite;
+}
+
+.plane-wake {
+  position: absolute;
+  left: -8%;
+  top: 0;
+  width: 18%;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55));
+  transform: translateY(-50%);
+  filter: blur(1px);
+  animation: wake-fade 16s linear infinite;
+}
+
+.hero-plane {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: clamp(140px, 34vw, 260px);
+  height: auto;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 10px 14px rgba(10, 40, 70, 0.35));
+  animation: plane-bob 2.4s ease-in-out infinite;
+}
+
+.title-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  padding:
+    calc(24px + var(--safe-top))
+    calc(24px + var(--safe-right))
+    calc(48px + var(--safe-bottom))
+    calc(24px + var(--safe-left));
+  text-align: center;
+}
+
+.brand {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(2.6rem, 11vw, 5.2rem);
+  letter-spacing: 0.18em;
+  text-indent: 0.18em;
+  color: var(--foam);
+  text-shadow:
+    0 2px 0 rgba(14, 39, 68, 0.25),
+    0 18px 40px rgba(8, 30, 60, 0.45);
+  animation: brand-rise 1s ease-out both;
+}
+
+.tagline {
+  margin: 0.7rem 0 0;
+  max-width: 18em;
+  font-size: clamp(0.95rem, 3.4vw, 1.15rem);
+  letter-spacing: 0.12em;
+  color: rgba(244, 249, 255, 0.9);
+  text-shadow: 0 2px 12px rgba(8, 30, 60, 0.45);
+  animation: brand-rise 1s ease-out 0.12s both;
+}
+
+.btn-start,
+.btn-secondary {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-indent: 0.2em;
+  transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.btn-start {
+  margin-top: clamp(1.6rem, 5vh, 2.8rem);
+  min-width: min(260px, 78vw);
+  min-height: 54px;
+  padding: 0.95rem 1.8rem;
+  border-radius: 4px;
+  color: #fff8f4;
+  background: linear-gradient(180deg, #e4573d 0%, var(--accent) 55%, var(--accent-deep) 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.25) inset,
+    0 10px 28px rgba(120, 30, 18, 0.35);
+  font-size: clamp(1.05rem, 3.8vw, 1.25rem);
+  animation: brand-rise 1s ease-out 0.22s both, cta-pulse 2.8s ease-in-out 1.2s infinite;
+}
+
+.btn-start:hover,
+.btn-start:focus-visible {
+  transform: translateY(-2px) scale(1.02);
+  background: linear-gradient(180deg, #ef6a4f 0%, #e04d34 55%, #b83924 100%);
+}
+
+.btn-start:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.btn-secondary {
+  margin-top: 0.85rem;
+  min-width: min(260px, 78vw);
+  min-height: 48px;
+  padding: 0.8rem 1.4rem;
+  border-radius: 4px;
+  color: var(--foam);
+  background: transparent;
+  border: 1px solid rgba(244, 249, 255, 0.45);
+  font-size: 1rem;
+}
+
+.btn-secondary:hover,
+.btn-secondary:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* —— 遊戲 HUD —— */
+#game-screen {
+  background: linear-gradient(180deg, #08284f 0%, #1a6bb5 48%, #6eb6ef 100%);
+}
+
+.hud {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding:
+    calc(12px + var(--safe-top))
+    calc(16px + var(--safe-right))
+    8px
+    calc(16px + var(--safe-left));
+  font-size: clamp(0.95rem, 3.2vw, 1.1rem);
+  letter-spacing: 0.08em;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+#game-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.hint {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: calc(14px + var(--safe-bottom));
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 0 12px;
+  width: min(92vw, 420px);
+  text-align: center;
+  font-size: clamp(0.75rem, 2.8vw, 0.9rem);
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.78);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+
+.hint.is-faded {
+  opacity: 0;
+}
+
+/* —— 結束畫面 —— */
+#over-screen {
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(30, 90, 150, 0.45), transparent 55%),
+    rgba(6, 18, 36, 0.78);
+  backdrop-filter: blur(4px);
+}
+
+.overlay-panel {
+  width: min(88vw, 360px);
+  padding: 2rem 1.5rem 1.5rem;
+  text-align: center;
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+}
+
+.overlay-panel h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 7vw, 2.4rem);
+  letter-spacing: 0.16em;
+  text-indent: 0.16em;
+}
+
+.overlay-panel p {
+  margin: 1rem 0 0.4rem;
+  letter-spacing: 0.1em;
+  color: rgba(244, 249, 255, 0.88);
+}
+
+#final-score {
+  font-family: var(--font-display);
+  font-size: 1.35em;
+  color: #ffd27a;
+}
+
+/* —— 動畫 —— */
+@keyframes cloud-drift {
+  from { transform: translateX(0); }
+  to { transform: translateX(140vw); }
+}
+
+@keyframes plane-cruise {
+  0% { transform: translateX(-25vw); }
+  100% { transform: translateX(125vw); }
+}
+
+@keyframes plane-bob {
+  0%, 100% { transform: translate(-50%, -54%) rotate(-2deg); }
+  50% { transform: translate(-50%, -46%) rotate(2deg); }
+}
+
+@keyframes wake-fade {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes sun-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.95; }
+  50% { transform: scale(1.05); opacity: 1; }
+}
+
+@keyframes glow-drift {
+  from { transform: translateX(-2%); }
+  to { transform: translateX(3%); }
+}
+
+@keyframes brand-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes cta-pulse {
+  0%, 100% { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 10px 28px rgba(120, 30, 18, 0.35); }
+  50% { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.3) inset, 0 14px 34px rgba(120, 30, 18, 0.48); }
+}
+
+/* 直向窄螢幕：標題區更靠下，留給飛機空間 */
+@media (orientation: portrait) and (max-width: 700px) {
+  .title-content {
+    justify-content: flex-end;
+    padding-bottom: calc(56px + var(--safe-bottom));
+  }
+
+  .plane-scene {
+    top: 38%;
+  }
+}
+
+/* 橫向：壓縮下方文案區，飛機偏上 */
+@media (orientation: landscape) and (max-height: 500px) {
+  .title-content {
+    justify-content: center;
+    align-items: flex-end;
+    padding:
+      calc(12px + var(--safe-top))
+      calc(28px + var(--safe-right))
+      calc(16px + var(--safe-bottom))
+      45%;
+    text-align: right;
+  }
+
+  .brand {
+    font-size: clamp(1.8rem, 8vh, 3rem);
+  }
+
+  .tagline {
+    margin-left: auto;
+  }
+
+  .btn-start {
+    margin-top: 1rem;
+    min-height: 46px;
+    margin-left: auto;
+  }
+
+  .plane-scene {
+    top: 48%;
+  }
+
+  .sun {
+    top: 8%;
+    right: 8%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cloud,
+  .plane-scene,
+  .hero-plane,
+  .plane-wake,
+  .sun,
+  .sky-glow,
+  .btn-start,
+  .brand,
+  .tagline {
+    animation: none !important;
+  }
+
+  .plane-scene {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .hero-plane {
+    transform: translate(-50%, -50%);
+  }
+}
