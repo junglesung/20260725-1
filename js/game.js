@@ -11,14 +11,19 @@
   const livesEl = document.getElementById("lives");
   const enemyCountEl = document.getElementById("enemy-count");
   const enemyGoalEl = document.getElementById("enemy-goal");
+  const timeLeftEl = document.getElementById("time-left");
   const overTitleEl = document.getElementById("over-title");
   const overMessageEl = document.getElementById("over-message");
   const hintEl = document.getElementById("control-hint");
   const canvas = document.getElementById("game-canvas");
   const ctx = canvas.getContext("2d");
 
-  // 過關條件：敵機出現 100 架
-  const ENEMY_CLEAR_GOAL = 100;
+  // 過關：200 架敵機中擊落 100 架，且須在 1 分鐘內完成
+  const ENEMY_SPAWN_TOTAL = 200;
+  const ENEMY_KILL_GOAL = 100;
+  const STAGE_TIME = 60;
+  const FOG_COUNT = 100;
+  const PUDDING_COUNT = 20;
 
   const state = {
     running: false,
@@ -28,6 +33,8 @@
     score: 0,
     lives: 3,
     enemiesSpawned: 0,
+    enemiesKilled: 0,
+    timeLeft: STAGE_TIME,
     cleared: false,
     player: null,
     bullets: [],
@@ -35,6 +42,7 @@
     particles: [],
     moneys: [],
     fogBands: [],
+    puddingDogs: [],
     dunes: [],
     desertDuck: null,
     ultraman: null,
@@ -49,6 +57,13 @@
     hintTimer: 0,
     sandOffset: 0,
   };
+
+  function formatTime(sec) {
+    const s = Math.max(0, Math.ceil(sec));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return `${m}:${String(r).padStart(2, "0")}`;
+  }
 
   function showScreen(screen) {
     [titleScreen, gameScreen, overScreen].forEach((el) => {
@@ -93,18 +108,18 @@
 
     // 沙漠裡有一隻鴨鴨
     state.desertDuck = {
-      x: state.width * 0.22,
+      x: state.width * 0.18,
       y: groundY + 18,
       scale: 1.15,
       bob: 0,
       facing: 1,
     };
 
-    // 沙漠裡有奧特曼
+    // 沙漠裡有奧特曼（偏左，右側留給布丁狗）
     state.ultraman = {
-      x: state.width * 0.72,
+      x: state.width * 0.42,
       y: groundY + 8,
-      scale: Math.min(1.35, state.width / 320),
+      scale: Math.min(1.2, state.width / 340),
       bob: 0,
       armPhase: 0,
     };
@@ -115,26 +130,46 @@
       { y: state.height * 0.82, amp: 44, color: "#e6b87a" },
     ];
 
-    state.fogBands = Array.from({ length: 5 }, (_, i) => ({
-      y: state.height * (0.2 + i * 0.14),
-      h: rand(40, 80),
-      speed: rand(8, 22) * (i % 2 === 0 ? 1 : -1),
-      offset: rand(0, 400),
-      alpha: 0.12 + i * 0.03,
+    // 霧濛 100 隻（個別霧團）
+    state.fogBands = Array.from({ length: FOG_COUNT }, (_, i) => ({
+      x: rand(0, state.width),
+      y: rand(state.height * 0.08, state.height * 0.92),
+      w: rand(36, 90),
+      h: rand(14, 32),
+      speed: rand(12, 40) * (i % 2 === 0 ? 1 : -1),
+      bob: rand(0, Math.PI * 2),
+      bobSpeed: rand(0.6, 1.8),
+      alpha: rand(0.1, 0.28),
     }));
+
+    // 布丁狗 20 隻，排在畫面右側
+    const rightX = state.width * 0.86;
+    state.puddingDogs = Array.from({ length: PUDDING_COUNT }, (_, i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      return {
+        x: rightX + col * Math.min(36, state.width * 0.07),
+        y: state.height * 0.12 + row * ((state.height * 0.78) / 10),
+        scale: 0.7 + (i % 3) * 0.08,
+        bob: rand(0, Math.PI * 2),
+        bobSpeed: rand(1.5, 2.8),
+      };
+    });
   }
 
   function resetGame() {
     state.score = 0;
     state.lives = 3;
     state.enemiesSpawned = 0;
+    state.enemiesKilled = 0;
+    state.timeLeft = STAGE_TIME;
     state.cleared = false;
     state.bullets = [];
     state.enemies = [];
     state.particles = [];
     state.moneys = [];
     state.shootCooldown = 0;
-    state.spawnTimer = 0.6;
+    state.spawnTimer = 0.2;
     state.invuln = 1.2;
     state.lastTs = 0;
     state.hintTimer = 4.5;
@@ -143,7 +178,8 @@
     scoreEl.textContent = "0";
     livesEl.textContent = "3";
     enemyCountEl.textContent = "0";
-    enemyGoalEl.textContent = String(ENEMY_CLEAR_GOAL);
+    enemyGoalEl.textContent = String(ENEMY_KILL_GOAL);
+    timeLeftEl.textContent = formatTime(STAGE_TIME);
     state.player = {
       x: state.width / 2,
       y: state.height - 72,
@@ -163,22 +199,28 @@
     state.raf = requestAnimationFrame(loop);
   }
 
-  function endGame(won) {
+  function endGame(won, reason) {
     state.running = false;
     cancelAnimationFrame(state.raf);
     if (won) {
       overTitleEl.textContent = "過關成功";
-      overMessageEl.innerHTML = `敵機已出現 ${ENEMY_CLEAR_GOAL} 架！獲得金錢 <span id="final-score">${state.score}</span>`;
+      overMessageEl.innerHTML =
+        `1 分鐘內擊落 ${ENEMY_KILL_GOAL} 架！獲得金錢 <span id="final-score">${state.score}</span>`;
     } else {
       overTitleEl.textContent = "任務失敗";
-      overMessageEl.innerHTML = `獲得金錢 <span id="final-score">${state.score}</span>`;
+      const why =
+        reason === "time"
+          ? `時間到！擊落 ${state.enemiesKilled}/${ENEMY_KILL_GOAL}`
+          : `擊落 ${state.enemiesKilled}/${ENEMY_KILL_GOAL}`;
+      overMessageEl.innerHTML =
+        `${why} · 獲得金錢 <span id="final-score">${state.score}</span>`;
     }
     showScreen(overScreen);
   }
 
   function checkStageClear() {
     if (state.cleared) return;
-    if (state.enemiesSpawned >= ENEMY_CLEAR_GOAL && state.enemies.length === 0) {
+    if (state.enemiesKilled >= ENEMY_KILL_GOAL) {
       state.cleared = true;
       endGame(true);
     }
@@ -191,20 +233,28 @@
   }
 
   function spawnEnemy() {
-    if (state.enemiesSpawned >= ENEMY_CLEAR_GOAL) return;
+    if (state.enemiesSpawned >= ENEMY_SPAWN_TOTAL) return;
     const size = rand(34, 48);
     state.enemies.push({
       x: rand(size, state.width - size),
       y: -size,
       w: size,
       h: size * 0.85,
-      speed: rand(70, 140) + state.score * 0.8,
+      speed: rand(90, 170) + state.enemiesKilled * 0.5,
       sway: rand(0, Math.PI * 2),
       swaySpeed: rand(1.2, 2.4),
       hp: 1,
     });
     state.enemiesSpawned += 1;
-    enemyCountEl.textContent = String(state.enemiesSpawned);
+  }
+
+  function registerKill(x, y) {
+    state.enemiesKilled += 1;
+    enemyCountEl.textContent = String(state.enemiesKilled);
+    spawnMoney(x, y, 10);
+    burst(x, y, "#ffe08a", 14);
+    burst(x, y, "#f0c040", 8);
+    checkStageClear();
   }
 
   function burst(x, y, color, count = 10) {
@@ -263,6 +313,19 @@
     let mx = 0;
     let my = 0;
 
+    state.timeLeft -= dt;
+    timeLeftEl.textContent = formatTime(state.timeLeft);
+    if (state.timeLeft <= 0) {
+      state.timeLeft = 0;
+      timeLeftEl.textContent = formatTime(0);
+      if (state.enemiesKilled >= ENEMY_KILL_GOAL) {
+        endGame(true);
+      } else {
+        endGame(false, "time");
+      }
+      return;
+    }
+
     if (state.keys.ArrowLeft || state.keys.a || state.keys.A) mx -= 1;
     if (state.keys.ArrowRight || state.keys.d || state.keys.D) mx += 1;
     if (state.keys.ArrowUp || state.keys.w || state.keys.W) my -= 1;
@@ -291,11 +354,11 @@
         y: p.y - 28,
         w: 30,
         h: 30,
-        speed: 380,
+        speed: 420,
         spin: rand(0, Math.PI * 2),
         spinSpeed: rand(6, 10),
       });
-      state.shootCooldown = 0.26;
+      state.shootCooldown = 0.16;
     }
 
     // 先更新子彈位置，再用較大判定檢查是否擊中敵機
@@ -305,11 +368,15 @@
     });
     state.bullets = state.bullets.filter((b) => b.y > -40);
 
-    if (state.enemiesSpawned < ENEMY_CLEAR_GOAL) {
+    // 200 架會陸續出現，節奏加快以便一分鐘內有機會擊落 100
+    if (state.enemiesSpawned < ENEMY_SPAWN_TOTAL) {
       state.spawnTimer -= dt;
       if (state.spawnTimer <= 0) {
         spawnEnemy();
-        const pace = Math.max(0.35, 1.1 - state.score * 0.01);
+        if (state.enemiesSpawned < ENEMY_SPAWN_TOTAL && Math.random() < 0.45) {
+          spawnEnemy();
+        }
+        const pace = Math.max(0.18, 0.42 - state.enemiesKilled * 0.0015);
         state.spawnTimer = pace;
       }
     }
@@ -331,9 +398,8 @@
         if (hitTest(e, b, 8)) {
           state.bullets.splice(j, 1);
           dead = true;
-          spawnMoney(e.x, e.y, 10);
-          burst(e.x, e.y, "#ffe08a", 14);
-          burst(e.x, e.y, "#f0c040", 8);
+          registerKill(e.x, e.y);
+          if (!state.running) return;
           break;
         }
       }
@@ -349,7 +415,7 @@
         state.invuln = 1.5;
         burst(p.x, p.y, "#7dba5a", 16);
         if (state.lives <= 0) {
-          endGame(false);
+          endGame(false, "lives");
           return;
         }
       }
@@ -357,7 +423,6 @@
       if (dead) state.enemies.splice(i, 1);
     }
 
-    checkStageClear();
     if (!state.running) return;
 
     state.particles = state.particles.filter((pt) => {
@@ -405,7 +470,14 @@
     }
 
     state.fogBands.forEach((f) => {
-      f.offset += f.speed * dt;
+      f.x += f.speed * dt;
+      f.bob += f.bobSpeed * dt;
+      if (f.speed > 0 && f.x - f.w > state.width) f.x = -f.w;
+      if (f.speed < 0 && f.x + f.w < 0) f.x = state.width + f.w;
+    });
+
+    state.puddingDogs.forEach((dog) => {
+      dog.bob += dog.bobSpeed * dt;
     });
 
     if (state.desertDuck) state.desertDuck.bob += dt * 2.2;
@@ -594,26 +666,93 @@
       drawDuck(d.x, d.y + Math.sin(d.bob) * 3, d.scale, d.facing, {});
     }
 
-    // 霧濛層
-    state.fogBands.forEach((f) => {
-      const grad = ctx.createLinearGradient(0, f.y, 0, f.y + f.h);
-      grad.addColorStop(0, `rgba(255, 236, 200, 0)`);
-      grad.addColorStop(0.5, `rgba(255, 230, 190, ${f.alpha})`);
-      grad.addColorStop(1, `rgba(255, 236, 200, 0)`);
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, f.y, state.width, f.h);
+    // 右側 20 隻布丁狗
+    state.puddingDogs.forEach((dog) => {
+      drawPuddingDog(dog.x, dog.y + Math.sin(dog.bob) * 3, dog.scale);
+    });
 
-      // 飄移霧團
-      ctx.globalAlpha = f.alpha * 1.4;
-      ctx.fillStyle = "rgba(255, 240, 210, 0.85)";
-      for (let i = 0; i < 3; i += 1) {
-        const fx = ((f.offset * 8 + i * 180) % (state.width + 200)) - 100;
-        ctx.beginPath();
-        ctx.ellipse(fx, f.y + f.h * 0.5, 90, 18, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
+    // 霧濛 100 隻
+    state.fogBands.forEach((f) => {
+      const fy = f.y + Math.sin(f.bob) * 6;
+      ctx.globalAlpha = f.alpha;
+      ctx.fillStyle = "rgba(255, 242, 215, 0.95)";
+      ctx.beginPath();
+      ctx.ellipse(f.x, fy, f.w * 0.5, f.h * 0.5, 0, 0, Math.PI * 2);
+      ctx.ellipse(f.x - f.w * 0.22, fy + 2, f.w * 0.28, f.h * 0.4, 0, 0, Math.PI * 2);
+      ctx.ellipse(f.x + f.w * 0.24, fy + 1, f.w * 0.3, f.h * 0.38, 0, 0, Math.PI * 2);
+      ctx.fill();
       ctx.globalAlpha = 1;
     });
+  }
+
+  function drawPuddingDog(x, y, scale = 1) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+
+    // 身體
+    ctx.fillStyle = "#f6d85a";
+    ctx.beginPath();
+    ctx.ellipse(0, 6, 14, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 頭
+    ctx.beginPath();
+    ctx.ellipse(0, -6, 12, 11, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 耳朵
+    ctx.fillStyle = "#e8c84a";
+    ctx.beginPath();
+    ctx.ellipse(-10, -10, 4.5, 6, -0.4, 0, Math.PI * 2);
+    ctx.ellipse(10, -10, 4.5, 6, 0.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 棕色貝雷帽
+    ctx.fillStyle = "#8b5a2b";
+    ctx.beginPath();
+    ctx.ellipse(0, -14, 11, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(8, -16, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 臉頰
+    ctx.fillStyle = "#f0a8a0";
+    ctx.beginPath();
+    ctx.ellipse(-7, -3, 2.4, 1.8, 0, 0, Math.PI * 2);
+    ctx.ellipse(7, -3, 2.4, 1.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 眼睛
+    ctx.fillStyle = "#2a2a2a";
+    ctx.beginPath();
+    ctx.arc(-4, -6, 1.3, 0, Math.PI * 2);
+    ctx.arc(4, -6, 1.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 鼻子嘴巴
+    ctx.fillStyle = "#5a3a20";
+    ctx.beginPath();
+    ctx.ellipse(0, -3.2, 1.6, 1.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#5a3a20";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, -2);
+    ctx.quadraticCurveTo(-3, 0, -5, -1);
+    ctx.moveTo(0, -2);
+    ctx.quadraticCurveTo(3, 0, 5, -1);
+    ctx.stroke();
+
+    // 腳
+    ctx.fillStyle = "#f6d85a";
+    ctx.beginPath();
+    ctx.ellipse(-8, 16, 3.5, 2.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(8, 16, 3.5, 2.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
   }
 
   function drawUltraman(x, y, scale = 1, armPhase = 0) {
