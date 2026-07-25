@@ -293,7 +293,6 @@
     for (let i = state.enemies.length - 1; i >= 0; i -= 1) {
       const e = state.enemies[i];
       let dead = false;
-      let turnedToMoney = false;
 
       for (let j = state.bullets.length - 1; j >= 0; j -= 1) {
         const b = state.bullets[j];
@@ -301,7 +300,6 @@
         if (hitTest(e, b, 8)) {
           state.bullets.splice(j, 1);
           dead = true;
-          turnedToMoney = true;
           spawnMoney(e.x, e.y, 10);
           burst(e.x, e.y, "#ffe08a", 14);
           burst(e.x, e.y, "#f0c040", 8);
