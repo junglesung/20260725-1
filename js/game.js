@@ -666,11 +666,6 @@
       drawDuck(d.x, d.y + Math.sin(d.bob) * 3, d.scale, d.facing, {});
     }
 
-    // 右側 20 隻布丁狗
-    state.puddingDogs.forEach((dog) => {
-      drawPuddingDog(dog.x, dog.y + Math.sin(dog.bob) * 3, dog.scale);
-    });
-
     // 霧濛 100 隻
     state.fogBands.forEach((f) => {
       const fy = f.y + Math.sin(f.bob) * 6;
@@ -682,6 +677,11 @@
       ctx.ellipse(f.x + f.w * 0.24, fy + 1, f.w * 0.3, f.h * 0.38, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1;
+    });
+
+    // 右側 20 隻布丁狗（畫在霧之上，清楚可見）
+    state.puddingDogs.forEach((dog) => {
+      drawPuddingDog(dog.x, dog.y + Math.sin(dog.bob) * 3, dog.scale);
     });
   }
 
