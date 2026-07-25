@@ -588,7 +588,16 @@
     // 身體（銀＋紅）
     ctx.fillStyle = "#e8edf2";
     ctx.beginPath();
-    ctx.roundRect(-12, -8, 24, 28, 4);
+    ctx.moveTo(-8, -8);
+    ctx.lineTo(8, -8);
+    ctx.quadraticCurveTo(12, -8, 12, -4);
+    ctx.lineTo(12, 16);
+    ctx.quadraticCurveTo(12, 20, 8, 20);
+    ctx.lineTo(-8, 20);
+    ctx.quadraticCurveTo(-12, 20, -12, 16);
+    ctx.lineTo(-12, -4);
+    ctx.quadraticCurveTo(-12, -8, -8, -8);
+    ctx.closePath();
     ctx.fill();
 
     // 紅色線條／腹甲
