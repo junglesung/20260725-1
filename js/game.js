@@ -108,16 +108,16 @@
 
     // 沙漠裡有一隻鴨鴨
     state.desertDuck = {
-      x: state.width * 0.18,
+      x: state.width * 0.38,
       y: groundY + 18,
       scale: 1.15,
       bob: 0,
       facing: 1,
     };
 
-    // 沙漠裡有奧特曼（偏左，右側留給布丁狗）
+    // 沙漠裡有奧特曼（置中偏右一點，左側布丁狗、右側霧濛）
     state.ultraman = {
-      x: state.width * 0.42,
+      x: state.width * 0.52,
       y: groundY + 8,
       scale: Math.min(1.2, state.width / 340),
       bob: 0,
@@ -130,25 +130,29 @@
       { y: state.height * 0.82, amp: 44, color: "#e6b87a" },
     ];
 
-    // 霧濛 100 隻（個別霧團）
+    // 霧濛 100 隻，集中在畫面右邊
+    const fogLeft = state.width * 0.58;
+    const fogRight = state.width * 0.98;
     state.fogBands = Array.from({ length: FOG_COUNT }, (_, i) => ({
-      x: rand(0, state.width),
-      y: rand(state.height * 0.08, state.height * 0.92),
+      x: rand(fogLeft, fogRight),
+      y: rand(state.height * 0.06, state.height * 0.94),
       w: rand(36, 90),
       h: rand(14, 32),
-      speed: rand(12, 40) * (i % 2 === 0 ? 1 : -1),
+      speed: rand(10, 28) * (i % 2 === 0 ? 1 : -1),
       bob: rand(0, Math.PI * 2),
       bobSpeed: rand(0.6, 1.8),
-      alpha: rand(0.1, 0.28),
+      alpha: rand(0.12, 0.32),
+      minX: fogLeft,
+      maxX: fogRight,
     }));
 
-    // 布丁狗 20 隻，排在畫面右側
-    const rightX = state.width * 0.86;
+    // 布丁狗 20 隻，排在畫面左邊
+    const leftX = state.width * 0.06;
     state.puddingDogs = Array.from({ length: PUDDING_COUNT }, (_, i) => {
       const col = i % 2;
       const row = Math.floor(i / 2);
       return {
-        x: rightX + col * Math.min(36, state.width * 0.07),
+        x: leftX + col * Math.min(36, state.width * 0.07),
         y: state.height * 0.12 + row * ((state.height * 0.78) / 10),
         scale: 0.7 + (i % 3) * 0.08,
         bob: rand(0, Math.PI * 2),
@@ -159,7 +163,7 @@
 
   function resetGame() {
     state.score = 0;
-    state.lives = 3;
+    state.lives = Infinity;
     state.enemiesSpawned = 0;
     state.enemiesKilled = 0;
     state.timeLeft = STAGE_TIME;
@@ -176,16 +180,17 @@
     state.sandOffset = 0;
     hintEl.classList.remove("is-faded");
     scoreEl.textContent = "0";
-    livesEl.textContent = "3";
+    livesEl.textContent = "∞";
     enemyCountEl.textContent = "0";
     enemyGoalEl.textContent = String(ENEMY_KILL_GOAL);
     timeLeftEl.textContent = formatTime(STAGE_TIME);
     state.player = {
       x: state.width / 2,
-      y: state.height - 72,
-      w: 52,
-      h: 40,
+      y: state.height - 96,
+      w: 88,
+      h: 70,
       speed: 320,
+      drawScale: 1.7,
     };
     layoutDesertProps();
   }
@@ -208,12 +213,8 @@
         `1 分鐘內擊落 ${ENEMY_KILL_GOAL} 架！獲得金錢 <span id="final-score">${state.score}</span>`;
     } else {
       overTitleEl.textContent = "任務失敗";
-      const why =
-        reason === "time"
-          ? `時間到！擊落 ${state.enemiesKilled}/${ENEMY_KILL_GOAL}`
-          : `擊落 ${state.enemiesKilled}/${ENEMY_KILL_GOAL}`;
       overMessageEl.innerHTML =
-        `${why} · 獲得金錢 <span id="final-score">${state.score}</span>`;
+        `時間到！擊落 ${state.enemiesKilled}/${ENEMY_KILL_GOAL} · 獲得金錢 <span id="final-score">${state.score}</span>`;
     }
     showScreen(overScreen);
   }
@@ -408,16 +409,11 @@
         dead = true;
       }
 
+      // 生命無限：撞到敵機只短暫無敵，不扣命、不結束
       if (!dead && state.invuln <= 0 && hitTest(e, p, 2)) {
         dead = true;
-        state.lives -= 1;
-        livesEl.textContent = String(state.lives);
-        state.invuln = 1.5;
+        state.invuln = 1.2;
         burst(p.x, p.y, "#7dba5a", 16);
-        if (state.lives <= 0) {
-          endGame(false, "lives");
-          return;
-        }
       }
 
       if (dead) state.enemies.splice(i, 1);
@@ -472,8 +468,14 @@
     state.fogBands.forEach((f) => {
       f.x += f.speed * dt;
       f.bob += f.bobSpeed * dt;
-      if (f.speed > 0 && f.x - f.w > state.width) f.x = -f.w;
-      if (f.speed < 0 && f.x + f.w < 0) f.x = state.width + f.w;
+      // 霧濛只在右邊區域來回飄
+      if (f.x > f.maxX) {
+        f.x = f.maxX;
+        f.speed = -Math.abs(f.speed);
+      } else if (f.x < f.minX) {
+        f.x = f.minX;
+        f.speed = Math.abs(f.speed);
+      }
     });
 
     state.puddingDogs.forEach((dog) => {
@@ -923,6 +925,7 @@
 
     ctx.save();
     ctx.translate(p.x, p.y);
+    ctx.scale(p.drawScale || 1.7, p.drawScale || 1.7);
 
     // 尾焰
     ctx.fillStyle = "rgba(255, 170, 70, 0.9)";
